@@ -208,6 +208,15 @@ def _safety_label(text: str) -> int:
     return 0
 
 
+# 扰动法构造的负例按定义就是安全红线（法条幻觉），需强制标 unsafe：
+# _safety_label 只查文本，无法察觉「张冠李戴」这种「法名+条号都真实存在但配对错误」的幻觉。
+_PERTURB_REJECTED_UNSAFE = {
+    "perturb_fabricate": True,               # 编造条号
+    "perturb_misattribute": True,            # 张冠李戴（引错法）
+    "perturb_no_disclaimer_overpromise": True,  # 去免责 + 绝对化
+}
+
+
 def build_dpo_dataset(output_path: str, sft_path: str = None,
                       law_file: str = None, max_perturb: int = 3000):
     print("=" * 60)
@@ -246,7 +255,8 @@ def build_dpo_dataset(output_path: str, sft_path: str = None,
     # 3) 加 SafeDPO 二值安全标签 + 重排（安全永远在 chosen 位）
     for p in dpo_pairs:
         c_safe = _safety_label(p["chosen"])
-        r_safe = _safety_label(p["rejected"])
+        # 扰动法构造的负例按定义是安全红线，强制 unsafe（见 _PERTURB_REJECTED_UNSAFE 说明）
+        r_safe = 1 if _PERTURB_REJECTED_UNSAFE.get(p.get("type")) else _safety_label(p["rejected"])
         if c_safe == 1 and r_safe == 0:
             p["chosen"], p["rejected"] = p["rejected"], p["chosen"]
             c_safe, r_safe = r_safe, c_safe
