@@ -1,0 +1,105 @@
+# Qwen3 Model Configuration for LexiCare（法律域）
+# Qwen3 支持混合思考模式（hybrid thinking），本方案仅用部署开关控制：
+#   推理时 enable_thinking=True/False；训练数据不强制 /think 结构。
+# 可用尺寸：0.6B / 1.7B / 4B / 8B / 14B / 32B / 235B-A22B (MoE)
+# ⚠️ 本文件是「模型菜单」参考，实际训练以 configs/lora_config.yaml 为准。
+#    RTX 4060 8GB 上：8B 跑不动（OOM 到共享内存）；4-bit 上 use_dora:true 会反量化爆显存。
+
+# ── Qwen3-8B（推荐：8GB 卡上质量上限，QLoRA 4-bit） ──
+qwen3_8b:
+  model_name: "Qwen/Qwen3-8B"
+  use_4bit: true            # QLoRA NF4
+  use_dora: true
+  use_rslora: true
+  lora_r: 16
+  lora_alpha: 16
+  lora_dropout: 0
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16   # effective batch = 16
+  learning_rate: 5.0e-5
+  num_train_epochs: 2
+  warmup_ratio: 0.1
+  lr_scheduler_type: "cosine"
+  max_seq_length: 2048
+  gradient_checkpointing: true
+  fp16: true
+  logging_steps: 10
+  save_steps: 200
+  eval_steps: 200
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+
+# ── Qwen3-4B（对比：显存宽裕、推理快） ──
+qwen3_4b:
+  model_name: "Qwen/Qwen3-4B"
+  use_4bit: true
+  use_dora: false        # 4-bit 上 DoRA 会反量化爆显存
+  use_rslora: true
+  lora_r: 8
+  lora_alpha: 8
+  lora_dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 3.0e-5
+  num_train_epochs: 1
+  warmup_ratio: 0.1
+  lr_scheduler_type: "cosine"
+  max_seq_length: 2048
+  gradient_checkpointing: true
+  fp16: true
+  logging_steps: 10
+  save_steps: 200
+  eval_steps: 200
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+
+# ── Qwen3-1.7B（对比：最轻，重度依赖 RAG） ──
+qwen3_1_7b:
+  model_name: "Qwen/Qwen3-1.7B"
+  use_4bit: false
+  use_dora: true
+  use_rslora: true
+  lora_r: 16
+  lora_alpha: 16
+  lora_dropout: 0
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  learning_rate: 5.0e-5
+  num_train_epochs: 2
+  warmup_ratio: 0.1
+  lr_scheduler_type: "cosine"
+  max_seq_length: 2048
+  gradient_checkpointing: true
+  fp16: true
+  logging_steps: 10
+  save_steps: 200
+  eval_steps: 200
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"

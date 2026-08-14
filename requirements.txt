@@ -1,0 +1,40 @@
+# LexiCare 依赖（实测可用版本，2026-08 锁定）
+# ⚠️ 安装顺序：torch 必须从 cu121 源装，否则会装成 CPU 版
+#   pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+
+# ── 深度学习（版本互相牵制，勿单独升级）──
+torch==2.5.1
+transformers==4.51.0        # Qwen3 最低 4.51
+trl==0.15.0                 # 0.12 与 transformers 4.51+ C 层 segfault
+peft==0.13.2
+datasets==3.1.0             # 4.x 与 torch 2.5.1 组合 import segfault
+accelerate==1.0.1           # unsloth 会升到 1.14.0，需回滚
+bitsandbytes==0.50.0
+
+# ── 推理 / 服务 ──
+gradio==4.44.0
+
+# ── RAG ──
+chromadb>=0.5.0
+rank-bm25
+
+# ── 评估 ──
+sacrebleu
+rouge-score
+
+# ── 数据处理 / 工具 ──
+numpy
+pandas
+pyyaml
+scikit-learn
+plotly
+jinja2
+huggingface_hub>=0.24.0
+sentencepiece
+protobuf
+modelscope
+wandb
+
+# ⚠️ 已移除 unsloth：Windows 上会把 torch 拉成 2.11.0+cpu（cuda.is_available()==False）
+#    并连带升级整个 HF 栈。训练走 scripts/04_train_lora.py（标准 Trainer + LoRA）。

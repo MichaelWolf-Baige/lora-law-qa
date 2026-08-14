@@ -1,0 +1,113 @@
+# Ablation Experiment Matrix
+# ⚠️ 本文件全部 use_dora:true，在 RTX 4060 8GB 的 4-bit 训练下会反量化爆显存（OOM）。
+#    8GB 卡上跑消融请先改 use_dora:false + 降 lr（参照 configs/lora_config.yaml 的实测配置）。
+
+experiments:
+  # Experiment 1: Rank comparison
+  - name: "rank_comparison"
+    variable: "lora_r"
+    values: [4, 8, 16, 32]
+    fixed:
+      use_dora: true
+      use_rslora: true
+      lora_alpha: "=r"        # Auto-set alpha = rank for rsLoRA
+      learning_rate: 2.0e-4
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Compare different LoRA ranks to find the best capacity-efficiency tradeoff"
+
+  # Experiment 2: Data size comparison
+  - name: "data_size"
+    variable: "max_train_samples"
+    values: [500, 1000, 2000, 3000]
+    fixed:
+      use_dora: true
+      use_rslora: true
+      lora_r: 16
+      lora_alpha: 16
+      learning_rate: 2.0e-4
+      num_train_epochs: 2
+    description: "Measure how training data volume affects fine-tuning quality"
+
+  # Experiment 3: Method comparison (LoRA vs DoRA)
+  - name: "method_comparison"
+    variable: "use_dora"
+    values: [false, true]
+    fixed:
+      use_rslora: true
+      lora_r: 16
+      lora_alpha: 16
+      learning_rate: 2.0e-4
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Compare standard LoRA vs Weight-Decomposed LoRA (DoRA)"
+
+  # Experiment 4: Learning rate
+  - name: "learning_rate"
+    variable: "learning_rate"
+    values: [5.0e-5, 1.0e-4, 2.0e-4, 5.0e-4]
+    fixed:
+      use_dora: true
+      use_rslora: true
+      lora_r: 16
+      lora_alpha: 16
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Find the optimal learning rate for LoRA fine-tuning"
+
+  # Experiment 5: Target modules
+  - name: "target_modules"
+    variable: "target_modules"
+    values:
+      - ["q_proj", "v_proj"]                          # Attention only
+      - ["q_proj", "k_proj", "v_proj", "o_proj"]       # All attention
+      - ["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"]  # All linear
+    fixed:
+      use_dora: true
+      use_rslora: true
+      lora_r: 16
+      lora_alpha: 16
+      learning_rate: 2.0e-4
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Determine which weight matrices benefit most from LoRA adaptation"
+
+  # Experiment 6: rsLoRA vs Standard Scaling (NEW)
+  - name: "rslora_vs_standard"
+    variable: "use_rslora"
+    values: [false, true]
+    fixed:
+      use_dora: true
+      lora_r: 32
+      lora_alpha: 32
+      learning_rate: 2.0e-4
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Compare rsLoRA (alpha/sqrt(r)) vs standard LoRA (alpha/r) at higher rank. rsLoRA expected to be much more stable."
+
+  # Experiment 7: DoRA at High Rank (NEW)
+  - name: "dora_high_rank"
+    variable: "use_dora"
+    values: [false, true]
+    fixed:
+      use_rslora: true
+      lora_r: 64
+      lora_alpha: 64
+      learning_rate: 1.0e-4
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Test whether DoRA's advantage is more pronounced at higher ranks (r=64)"
+
+  # Experiment 8: LoRA Dropout (NEW)
+  - name: "dropout_comparison"
+    variable: "lora_dropout"
+    values: [0.0, 0.05, 0.1]
+    fixed:
+      use_dora: true
+      use_rslora: true
+      lora_r: 16
+      lora_alpha: 16
+      learning_rate: 2.0e-4
+      max_train_samples: 2000
+      num_train_epochs: 2
+    description: "Unsloth recommends dropout=0 for optimized performance. Test if this holds for legal fine-tuning."

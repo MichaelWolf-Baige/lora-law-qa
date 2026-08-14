@@ -1,0 +1,44 @@
+# LoRA Training Configuration — LexiCare（法律域，Qwen3-4B）
+# 8GB 显存：QLoRA 4-bit 训练；4B 权重 ~2.3GB，显存宽裕
+
+# Model
+model_name: "Qwen/Qwen3-4B"
+use_4bit: true            # QLoRA NF4 —— 8B 在 8GB 上必须用 4-bit
+use_dora: false           # DoRA 在 4-bit 上初始化会反量化爆显存（8GB 卡禁用），用标准 LoRA
+
+# LoRA Hyperparameters
+lora_r: 8
+lora_alpha: 8             # rsLoRA: alpha=r
+lora_dropout: 0.05        # 防遗忘：加 dropout 正则化
+use_rslora: true          # rank-stabilized 缩放，防梯度崩溃
+target_modules:
+  - "q_proj"
+  - "k_proj"
+  - "v_proj"
+  - "o_proj"
+  - "gate_proj"
+  - "up_proj"
+  - "down_proj"
+
+# Training
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16   # effective batch = 16
+learning_rate: 3.0e-5             # 防遗忘：比 5e-5 更温和
+num_train_epochs: 1                # 防遗忘：1 epoch 减少过拟合
+warmup_ratio: 0.1
+lr_scheduler_type: "cosine"
+max_seq_length: 2048              # 法律条文/判决，2048 是 8GB 甜点
+gradient_checkpointing: true
+fp16: true                        # RTX4060 上 bf16 更慢，已实测
+bf16: false
+logging_steps: 10
+save_steps: 200
+eval_steps: 200
+save_total_limit: 3
+load_best_model_at_end: true
+metric_for_best_model: "eval_loss"   # TODO: 后续换成法条引用准确率等下游指标
+
+# Data（数据管道待后续研究，processed 路径优先）
+max_train_samples: 3000
+max_eval_samples: 500

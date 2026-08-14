@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# 大文件 / 生成物（可从官方源重建，不入库）
+data/raw/laws.jsonl
+data/raw/laws_full.zip
+data/vector_db/
+data/processed/tokenized/
+outputs/
+wandb/
+
+# 系统
+.DS_Store
+Thumbs.db
