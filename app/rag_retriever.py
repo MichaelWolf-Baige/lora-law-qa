@@ -274,37 +274,47 @@ class HybridRetriever:
         return fused[:top_k]
 
     def _rrf_fusion(self, bm25_results: list, dense_results: list, k: int = 60) -> list:
-        scores = {}
-        for rank, (doc_idx, bm25_score) in enumerate(bm25_results):
-            doc_id = f"bm25_{doc_idx}"
-            scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank + 1)
-            if doc_idx < len(self.documents):
-                doc = self.documents[doc_idx]
-                scores[f"{doc_id}_info"] = {
-                    "content": doc.get("content", ""),
-                    "source": doc.get("source", "unknown"),
-                    "title": doc.get("title", ""),
-                    "method": "bm25",
-                }
+        """加权 RRF 融合：按「内容」对齐 BM25 与 Dense 命中（同一 chunk 两边都中则分数相加）。
+
+        实测（口语化法律查询）：BM25 字级 bigram 会返回大量不相关条文并占据 top 位，
+        Dense（bge 语义）才找得到真正的法条。故：
+        - 按 content 对齐（旧实现用 bm25_{idx}/dense_{rank} 两套独立 id，永远合并不了）；
+        - Dense 权重 > BM25（口语→法言 靠语义，不靠字面）。
+        """
+        scores: dict = {}   # content -> rrf 分数
+        infos: dict = {}    # content -> 文档信息
+        bm25_w, dense_w = 0.5, 1.0
+
+        for rank, (doc_idx, _bm25_score) in enumerate(bm25_results):
+            if doc_idx >= len(self.documents):
+                continue
+            doc = self.documents[doc_idx]
+            content = doc.get("content", "")
+            if not content:
+                continue
+            scores[content] = scores.get(content, 0.0) + bm25_w / (k + rank + 1)
+            infos[content] = {
+                "content": content,
+                "source": doc.get("source", "unknown"),
+                "title": doc.get("title", ""),
+                "method": "bm25",
+            }
+
         for rank, result in enumerate(dense_results):
-            doc_id = f"dense_{rank}"
-            scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank + 1)
-            scores[f"{doc_id}_info"] = result
+            content = result.get("content", "")
+            if not content:
+                continue
+            scores[content] = scores.get(content, 0.0) + dense_w / (k + rank + 1)
+            if content in infos:
+                infos[content]["method"] = "hybrid"
+            else:
+                infos[content] = result
 
         fused = []
-        seen_content = set()
-        for doc_id in sorted(
-            [k_ for k_ in scores.keys() if not k_.endswith("_info")],
-            key=lambda x: scores.get(x, 0.0) if isinstance(scores.get(x, 0.0), (int, float)) else 0.0,
-            reverse=True,
-        ):
-            if doc_id.endswith("_info"):
-                continue
-            info = scores.get(f"{doc_id}_info")
-            if info and info["content"] not in seen_content:
-                info["score"] = scores[doc_id]
-                fused.append(info)
-                seen_content.add(info["content"])
+        for content, score in sorted(scores.items(), key=lambda kv: -kv[1]):
+            info = dict(infos[content])
+            info["score"] = score
+            fused.append(info)
         return fused
 
     def _rerank(self, query: str, documents: list, top_k: int) -> list:
