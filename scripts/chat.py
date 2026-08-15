@@ -29,6 +29,8 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = PeftModel.from_pretrained(model, ADAPTER)
+    if hasattr(model.generation_config, "enable_thinking"):
+        model.generation_config.enable_thinking = False   # 关闭 Qwen3 思考模式
     model.eval()
     retriever = get_retriever()
     sys_prompt = get_domain().default_system_prompt
@@ -53,8 +55,7 @@ def main():
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():
             out = model.generate(**inputs, max_new_tokens=400, do_sample=True,
-                                 temperature=0.7, top_p=0.9, repetition_penalty=1.15,
-                                 enable_thinking=False)
+                                 temperature=0.7, top_p=0.9, repetition_penalty=1.15)
         ans = tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
         if "</think>" in ans:
             ans = ans.split("</think>")[-1].strip()

@@ -75,6 +75,8 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = PeftModel.from_pretrained(model, ADAPTER)
+    if hasattr(model.generation_config, "enable_thinking"):
+        model.generation_config.enable_thinking = False   # 关闭 Qwen3 思考模式
     model.eval()
     retriever = None if args.no_rag else get_retriever()
     lookup = build_statute_lookup(LAW_FILE)
@@ -104,8 +106,7 @@ def main():
                   f"<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n")
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():
-            out = model.generate(**inputs, max_new_tokens=300, do_sample=False,
-                                 enable_thinking=False)
+            out = model.generate(**inputs, max_new_tokens=300, do_sample=False)
         ans = tokenizer.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
         # 兜底剥离思考标记（若仍残留思考模式，恢复 </think> 之后的真实回答）
         if "</think>" in ans:
