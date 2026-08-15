@@ -171,10 +171,17 @@ class HybridRetriever:
             )
             # 中文 embedding（bge-small-zh-v1.5），替代 ChromaDB 默认英文 MiniLM
             try:
+                # 上 GPU：默认 CPU 会让每次 query 嵌入 ~4s（103 题 ≈ 7 分钟）；GPU 下 <100ms
+                try:
+                    import torch
+                    _device = "cuda" if torch.cuda.is_available() else "cpu"
+                except Exception:
+                    _device = "cpu"
                 self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
                     model_name="BAAI/bge-small-zh-v1.5",
+                    device=_device,
                 )
-                print("   中文 embedding: BAAI/bge-small-zh-v1.5")
+                print(f"   中文 embedding: BAAI/bge-small-zh-v1.5 ({_device})")
             except Exception as e:
                 print(f"   ⚠ 中文 embedding 初始化失败: {e}，回退 ChromaDB 默认")
                 self.embedding_fn = None
