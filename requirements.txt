@@ -18,6 +18,8 @@ gradio==4.44.0
 # ── RAG ──
 chromadb>=0.5.0
 rank-bm25
+sentence-transformers      # cross-encoder 精排 + bge embedding
+pymupdf                    # 通用文档问答的 PDF 解析
 
 # ── 评估 ──
 sacrebleu

@@ -74,6 +74,9 @@ class RagSpec:
     synonyms: Mapping[str, str]                # 查询词 -> 扩展词
     simple_patterns: Tuple[str, ...]           # 简单问题（跳过 RAG）
     complex_patterns: Tuple[str, ...]          # 复杂问题（必须 RAG + 重排）
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"   # cross-encoder 精排模型（吸收自 DocQA）
+    reranker_enabled: bool = False                      # 默认关；生产建议 True
+    reranker_device: str = "cpu"                        # cpu 避免与 4B 生成模型抢 8GB 显存
 
 
 @dataclass(frozen=True)
@@ -375,6 +378,7 @@ _LEGAL_RAG = RagSpec(
         r"(?:竞业|解除|无效|违约).{0,4}(?:条件|有效|成立)",
         r"(?:区别|对比|哪个.{0,3}好|能不能|可以吗).{0,4}(?:赔偿|起诉|仲裁)",
     ),
+    reranker_enabled=True,   # 生产启用 cross-encoder 精排（未下载/显存不足时自动回退启发式）
 )
 
 _LEGAL_CATEGORIES: Dict[str, Tuple[str, ...]] = {

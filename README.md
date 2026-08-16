@@ -42,6 +42,7 @@ LexiCare 是一个**本地全法律领域的咨询助手**，覆盖劳动、合�
 | **知识产权** | 商标、专利、著作权侵权 | "商标被抢注了怎么办" |
 | **行政** | 行政处罚、行政复议、行政诉讼 | "不服行政处罚怎么办" |
 | **安全护栏** | 强制引用法条 + 免责声明，拒绝承诺胜诉/冒充律师 | 越界引导咨询执业律师 |
+| **通用文档问答** | 上传任意 PDF/txt，实时解析分块 + RAG 问答（吸收 DocQA） | "上传产品手册，问具体参数" |
 
 ---
 
@@ -66,6 +67,12 @@ LexiCare 是一个**本地全法律领域的咨询助手**，覆盖劳动、合�
    │ 法条/司法解释│ │ Qwen3      │ │ 编造法条检测 │
    └────────────┘ └────────────┘ └────────────┘
 ```
+
+### RAG 检索能力（吸收自 DocQA）
+
+RAG 检索吸收自 DocQA 的 **cross-encoder 语义精排**（`BAAI/bge-reranker-v2-m3`）：混合检索（BM25 + Dense）粗排后，用 cross-encoder 对候选条文做语义精排，显著提升口语化查询的命中率（「被辞退能拿多少赔偿」「劳动仲裁时效多久」等题 top1 命中正确条文）。
+
+在 `app/domain_config.py#RagSpec` 里开关（`reranker_enabled` / `reranker_model` / `reranker_device`）。模型未下载或显存不足时自动回退启发式重排，不崩。
 
 ### 低耦合设计（换领域的关键）
 
@@ -178,6 +185,16 @@ python app/gradio_app.py        # Gradio Demo
 python -m uvicorn app.api:app   # FastAPI 服务
 ```
 
+### 6. 通用文档问答（实时摄入任意文档）
+
+```bash
+# 上传任意 PDF/txt，实时解析分块 + RAG 问答（复用混合检索 + cross-encoder 精排）
+python scripts/doc_qa.py --doc 你的文件.pdf
+python scripts/doc_qa.py --doc 你的文件.txt --base_only   # 不用法律 LoRA，用基座模型
+python scripts/doc_qa.py --doc 你的文件.pdf --no_dense    # 只 BM25（更快）
+python app/doc_qa_gradio.py                               # Gradio UI（拖拽上传文档）
+```
+
 ---
 
 ## 数据策略
@@ -276,7 +293,9 @@ lora-law-qa/
 │   ├── data_quality.py         # 数据质量共享模块（NHSR/去重/引用提取/中文数字）
 │   ├── safety_guard.py         # 四层安全护栏
 │   ├── intent_router.py        # 意图分类路由
-│   ├── rag_retriever.py        # 混合 RAG 检索（BM25 + 可选 Dense）
+│   ├── rag_retriever.py        # 混合 RAG 检索（BM25 + Dense + cross-encoder 精排）
+│   ├── document_ingestion.py   # 通用文档摄入（PDF/txt 解析 + 分块，吸收 DocQA）
+│   ├── document_qa.py          # 通用文档问答（实时摄入 + 复用检索）
 │   ├── hallucination_detector.py # 幻觉检测
 │   ├── gradio_app.py / api.py  # Demo / API
 │   └── ...

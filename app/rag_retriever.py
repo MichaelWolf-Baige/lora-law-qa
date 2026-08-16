@@ -121,6 +121,53 @@ class BM25Retriever:
 
 
 # ──────────────────────────────────────────────
+# Cross-encoder 精排（吸收自 DocQA 的 BGEReranker）
+# ──────────────────────────────────────────────
+
+class CrossEncoderReranker:
+    """Cross-encoder 语义精排。
+
+    懒加载 cross-encoder 模型；加载/推理失败（模型未下载、显存不足）返回 None，
+    由 `HybridRetriever._rerank` 回退到启发式重排——保证无 GPU / 无模型环境不崩。
+    """
+
+    def __init__(self, model_name: str = "BAAI/bge-reranker-v2-m3", device: str = "cpu"):
+        self.model_name = model_name
+        self.device = device
+        self._model = None
+        self._failed = False
+
+    def _load(self):
+        if self._model is not None or self._failed:
+            return self._model
+        try:
+            from sentence_transformers import CrossEncoder
+            self._model = CrossEncoder(self.model_name, device=self.device, max_length=512)
+            print(f"   Cross-encoder 精排: {self.model_name} ({self.device})")
+        except Exception as e:
+            print(f"   ⚠ Cross-encoder 加载失败（回退启发式重排）: {e}")
+            self._failed = True
+            self._model = None
+        return self._model
+
+    def rerank(self, query: str, candidates: list, top_k: int):
+        """返回精排后的 top_k；失败返回 None（调用方回退启发式）。"""
+        model = self._load()
+        if model is None or not candidates:
+            return None
+        pairs = [(query, c.get("content", "")) for c in candidates]
+        try:
+            scores = model.predict(pairs, batch_size=16, show_progress_bar=False)
+            for c, s in zip(candidates, scores):
+                c["rerank_score"] = round(float(s), 4)
+            ranked = sorted(candidates, key=lambda x: x.get("rerank_score", 0), reverse=True)
+            return ranked[:top_k]
+        except Exception as e:
+            print(f"   ⚠ Cross-encoder 精排失败（回退启发式）: {e}")
+            return None
+
+
+# ──────────────────────────────────────────────
 # 混合检索器
 # ──────────────────────────────────────────────
 
@@ -138,6 +185,10 @@ class HybridRetriever:
         self.embedding_fn = None
         self.use_reranker = use_reranker
         self.use_dense = use_dense
+        self.reranker = CrossEncoderReranker(
+            model_name=self.config.rag.reranker_model,
+            device=self.config.rag.reranker_device,
+        )
         self._init_vector_db()
         self._load_bm25_from_disk()
 
@@ -325,7 +376,13 @@ class HybridRetriever:
         return fused
 
     def _rerank(self, query: str, documents: list, top_k: int) -> list:
-        """启发式重排：关键词覆盖 + 法条引用/时效加成。"""
+        """精排：优先 cross-encoder 语义精排（吸收自 DocQA），失败回退启发式。"""
+        if self.config.rag.reranker_enabled:
+            ranked = self.reranker.rerank(query, documents, top_k)
+            if ranked is not None:
+                return ranked
+
+        # 启发式回退：关键词覆盖 + 法条引用/时效加成
         for doc in documents:
             content = doc.get("content", "")
             # 查询词覆盖加成
