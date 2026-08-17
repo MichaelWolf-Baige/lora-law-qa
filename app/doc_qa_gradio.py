@@ -101,7 +101,10 @@ def create_ui():
             with gr.Column(scale=2):
                 answer = gr.Textbox(label="回答", lines=16)
                 sources = gr.Textbox(label="检索到的内容片段", lines=8)
-        file_input.change(pipe.ingest, file_input, ingest_status)
+        # api_name=False：绕开 gradio 4.44.0 + gradio_client 1.3.0 的已知 bug——
+        # gr.File 作为事件处理器输入时，get_api_info() 生成 schema 会崩
+        # （TypeError: argument of type 'bool' is not iterable）
+        file_input.change(pipe.ingest, file_input, ingest_status, api_name=False)
         submit_btn.click(pipe.ask, question, [answer, sources])
     return demo
 
