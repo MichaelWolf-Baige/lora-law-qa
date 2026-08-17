@@ -61,5 +61,43 @@
 - 简历上本项目（LexiCare）= 应用/工程主打项目（微调 + RAG + 安全 + 评测）；chat-from-scratch = 算法/原理项目（独立）。
 - 后续做 LangChain 项目补「Agent/工具编排」维度。
 
+## 2026-08-17 决策门：前端重做（技术选型）
+
+用户拍板：
+
+| # | 决策点 | 候选 | 用户选择 |
+|---|--------|------|---------|
+| 1 | 前端方案 | Chainlit / 打磨 Gradio5 / 自定义 React+Vue / 轻量 HTML+JS | **Chainlit** |
+| 2 | 测试文档 | I.pdf 加密 → 换未加密版 / 换文档 / 跳过 | **I.pdf 实际非加密**（读取器误报，实为 29 页旅游合同示范文本） |
+
+关键结论：
+- Chainlit = 纯 Python LLM 聊天框架，开箱即用流式/气泡/文件上传，复用 `app/` 模块零重写。风险：原团队 2025-05 停更、社区维护（演示/简历场景可接受）。
+- 复用推理链路：`Qwen3-4B` + `law-lora-r8-20260814-1732` + 4-bit + `enable_thinking=False`（同 chat.py / doc_qa.py）。
+- 前端是「纯消费者」，不改任何现有 `app/` 模块。
+
+## 2026-08-17 纠偏：前端无法上传文档（bug 修复）
+
+**症状**：Chainlit 输入框没有上传按钮，无法上传 PDF/txt。
+
+**根因**：Chainlit 2.x 的「自发文件上传」功能（`features.spontaneous_file_upload`）默认 `enabled=None`（关闭）。我写的 config.toml 没包含该段，走 dataclass 默认 None，server 端 `validate_file_upload` 直接拒绝 → 输入框不显示上传入口。
+
+**修复**：config.toml 增 `[features.spontaneous_file_upload] enabled=true`，`accept=["application/pdf","text/plain","text/markdown","text/x-markdown"]`、`max_files=1`、`max_size_mb=20`。已验证 `chainlit.config.config.features.spontaneous_file_upload.enabled == True`。
+
+**handler 逻辑无需改**：`message.elements → cl.File.path` 读取路径正确（`upload_file → session.persist_file` 会落本地并返回 path）。
+
+## 2026-08-17 完整 e2e 测试（Playwright 驱动浏览器），发现并修复 3 个 bug
+
+用 Playwright 真实驱动浏览器走「上传 I.pdf → 摄入 → 提问 → 回答」全流程，发现并修复：
+
+| # | bug | 根因 | 修复 |
+|---|---|---|---|
+| 1 | `No module named 'app.domain_config'; 'app' is not a package` | Chainlit `load_module` 把 `app/` 插到 `sys.path[0]` 执行模块后 `pop(0)`；我的 `sys.path.insert(0, 项目根)` 被它误 pop，`app/` 留在 sys.path[0]，`import app` 解析成 `app/app.py`（同名冲突）而非 `app` 包 | `insert(0)` → `append`，让项目根存活、`app/` 被正确清掉 |
+| 2 | `</think>` 思考内容泄漏到回答 | 手写 prompt 未加空 think 块，`generation_config.enable_thinking=False` 对 Qwen3 手写格式不生效 | prompt 末尾补 `<think>\n\n</think>\n\n`（对应 chat_template `enable_thinking=false` 分支） |
+| 3 | 文档问答误用法律安全护栏 | `SafetyGuard.check_input` 无条件套在 doc 模式，问「行程集合点」等非法律问题会被误判 off_topic | 护栏移到 legal 分支内，doc 模式不走法律护栏 |
+
+**验证结果（两种模式均端到端通过）**：
+- 文档问答：上传 I.pdf → 47 块 → 「行程开始前3天退团」→ 正确答「15% 违约金」+ 引用来源，无 `</think>`
+- 法律咨询：「被公司辞退赔偿」→ 正确引用《劳动合同法》46条 + 实施条例25条 + 免责声明 + 来源，无 `</think>`
+
 
 

@@ -16,6 +16,7 @@ bitsandbytes==0.50.0
 gradio==4.44.0
 gradio_client==1.3.0      # gradio 4.44 精确匹配（gr.File schema 需 1.3.0）
 starlette<1.0             # starlette 1.x 破坏 gradio 4.44 的 Jinja2 模板渲染
+chainlit==2.11.1          # 统一前端（法律咨询 + 文档问答），复用 app/ 模块
 
 # ── RAG ──
 chromadb>=0.5.0

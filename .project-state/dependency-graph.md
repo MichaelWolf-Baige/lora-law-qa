@@ -81,3 +81,46 @@ pretrain/  ──▶ 无任何 import 指向 app/（decoupled，仅共享顶层 
 - **L2 局部测试**：`rag_retriever.py` 冒烟（无 GPU、无 rerank 模型 → 回退启发式，不崩）；`retrieve()` 返回含 id。
 - **L3 全量回归**：`04_build_rag.py --rebuild` + 5 条测试 query 命中。
 - **L4 效果验收**：对照 anchor.md 完成定义（A1 rerank 可用 / A2 口语改写 / A3 103 题三项指标不退化 / B1 pretrain 可跑 / B2 解耦 / C1 三阶段入口 / C2 无重复）。
+
+---
+
+## 7. 前端重做（Chainlit，本轮 2026-08-17）
+
+### 定位
+用 Chainlit 统一现有 3 个割裂的 Gradio 界面（gradio_app / app / doc_qa_gradio）+ FastAPI，做成一个现代聊天应用。**前端是纯消费者，不改任何现有 `app/` 模块**——复用它们的既有接口即可。
+
+### 新增模块（单文件，自包含）
+```
+app/chainlit_app.py    # 统一 Chainlit 前端：法律咨询（默认）+ 文档问答（上传文件触发）
+                       # 内置模型加载（同 chat.py 的 4-bit + enable_thinking=False，Qwen3-4B + law-lora-r8）
+```
+
+### 依赖关系（谁依赖谁）
+```
+app/chainlit_app.py ──import──▶ app/domain_config      (get_domain: default_system_prompt)
+                    ──import──▶ app/rag_retriever      (get_retriever: 法条 RAG)
+                    ──import──▶ app/document_qa        (DocumentQA: 文档 RAG)
+                    ──import──▶ app/safety_guard       (SafetyGuard: 输入护栏)
+                    ──import──▶ transformers + peft    (模型加载，同 chat.py 链路)
+                    ──新增依赖──▶ chainlit             (UI 框架)
+```
+
+### 变更影响面（改 A 查 B）
+- **改**：仅新增 `app/chainlit_app.py` + `requirements.txt` 增 `chainlit` + 可选 `.chainlit/config.toml`（主题）。
+- **不动**：`domain_config / rag_retriever / document_qa / safety_guard` 及 3 个旧 Gradio 文件、`api.py` 全部零改动。
+- **风险点**：chainlit 与 gradio 4.44 共享 starlette/fastapi 依赖，需验证无版本冲突（`starlette<1.0` 约束下 chainlit 2.x 应兼容）。
+
+### 接口契约（复用，不破坏）
+```python
+get_domain().default_system_prompt                # str
+get_retriever().retrieve(q, top_k=3) -> list[dict]  # 法条：content/source/title/score/method
+get_retriever().format_context(docs, max_chars)   # str
+DocumentQA(doc_path).retrieve(q, top_k=3)         # 文档：同 schema
+SafetyGuard().check_input(q) -> result(.safe/.category/.fallback_response)
+```
+
+### 验证计划
+- **L1 数据/加载**：`import app.chainlit_app` 无异常（不加载模型）；`chainlit` 可 import。
+- **L2 局部**：demo 模式（无模型）启动 UI → 法律咨询返回占位、文档上传触发 DocumentQA 分块（I.pdf）。
+- **L3 全量**：加载模型后，法律咨询口语化查询命中法条、I.pdf 文档问答命中合同条款（违约金/争议解决）。
+- **L4 验收**：对照 anchor.md 完成定义 F1–F6。

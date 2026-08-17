@@ -51,7 +51,7 @@ LexiCare 是一个**本地全法律领域的咨询助手**，覆盖劳动、合�
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                      用户界面                             │
-│              Gradio Demo / FastAPI                        │
+│          Chainlit 前端 / Gradio Demo / FastAPI           │
 └────────────────────────┬─────────────────────────────────┘
                          │
 ┌────────────────────────┴─────────────────────────────────┐
@@ -181,11 +181,14 @@ git clone https://github.com/open-compass/LawBench
 ### 5. 推理与 Demo
 
 ```bash
-python app/gradio_app.py        # Gradio Demo
-python -m uvicorn app.api:app   # FastAPI 服务
+chainlit run app/chainlit_app.py -w   # ⭐ 统一前端（法律咨询 + 文档问答，流式 + 引用来源）
+python app/gradio_app.py              # Gradio Demo（旧，保留）
+python -m uvicorn app.api:app         # FastAPI 服务
 ```
 
 ### 6. 通用文档问答（实时摄入任意文档）
+
+> ⭐ 前端推荐：`chainlit run app/chainlit_app.py -w`，在输入框点 📎 上传文档即可切换文档问答模式。
 
 ```bash
 # 上传任意 PDF/txt，实时解析分块 + RAG 问答（复用混合检索 + cross-encoder 精排）

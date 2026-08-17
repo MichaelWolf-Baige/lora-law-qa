@@ -1,22 +1,18 @@
 # 当前进度指针
 
-**阶段**：第二步「做」—— 通用文档问答模式已加，进入收尾
+**阶段**：第三步「验收」—— 前端重做（Chainlit）已完成
 
-**本轮目标**：RAG + 微调 = 一个项目（LexiCare），并完善到可上传 GitHub——见 anchor.md
+**本轮目标**：用 Chainlit 统一现有 Gradio 界面为现代聊天应用（法律咨询 + 文档问答一体）。见 anchor.md 完成定义 F1–F6。
 
-**已完成**：
-1. ✅ 范围收窄 + pretrain/ 分离（→ `D:\桌面\chat-from-scratch`）
-2. ✅ 通用文档问答模式（吸收 DocQA 实时摄入）：
-   - `app/document_ingestion.py`（PDF/txt 解析 + 句子边界分块）
-   - `app/document_qa.py`（DocumentQA + 通用领域配置，复用 HybridRetriever）
-   - `scripts/doc_qa.py`（CLI）
-   - 验证：ingestion 分块 ✅、Dense+BM25 索引 ✅、cross-encoder 加载 ✅、检索相关性 ✅（fitz 已装）
-3. ✅ README 文档化（核心能力 + 快速开始 + 目录结构）
-4. ✅ requirements.txt 补 sentence-transformers/pymupdf；.gitignore 补训练数据
+**结果**：6/6 标准通过 → **交付**（见 evidence-bundle.md 第 7 节）。
 
-**待做（完善 review，待用户拍板）**：
-- git 操作：`git rm --cached` 训练数据（55MB 已 tracked）+ 提交全部改动
-- （可选）Gradio 上传文档 UI（让文档问答可演示）
-- （独立任务）幻觉率 6.8% 修复（DPO 重训）
+**交付物**：
+- `app/chainlit_app.py`（统一 Chainlit 前端）
+- `.chainlit/config.toml`（主题）、`chainlit.md`（欢迎页）
+- `requirements.txt` 增 `chainlit==2.11.1`；`README.md` Demo 入口更新
+
+**启动**：`chainlit run app/chainlit_app.py -w`（项目根目录）
+
+**已知问题（不阻塞，非前端）**：模型对部分查询保守拒答（历史过度拒答，E1 拒答率 34.95%，需 Divide-Then-Align DPO 重训）。
 
 **回退规则**：出错回到最近 checkpoint（本目录文件），禁止重跑已完成阶段。

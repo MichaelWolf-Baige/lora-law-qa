@@ -1,0 +1,19 @@
+[meta]
+generated_by = "2.11.1"
+
+[project]
+session_timeout = 300
+
+[UI]
+name = "LexiCare 法律咨询助手"
+default_theme = "dark"
+layout = "wide"
+
+[features]
+unsafe_allow_html = false
+
+[features.spontaneous_file_upload]
+enabled = true
+accept = ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"]
+max_files = 1
+max_size_mb = 20

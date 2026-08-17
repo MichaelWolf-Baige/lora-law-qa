@@ -16,6 +16,10 @@ data/processed/tokenized/
 outputs/
 wandb/
 
+# Chainlit 运行时（上传缓存 / 自动生成的 UI 翻译）
+.files/
+.chainlit/translations/
+
 # 系统
 .DS_Store
 Thumbs.db
